@@ -75,7 +75,11 @@ jobs:
             cpio \
             kmod \
             rsync \
-            libelf-dev
+            libelf-dev \
+            clang \
+            lld \
+            llvm \
+            llvm-dev
       
       - name: Verify toolchain
         run: |
@@ -88,7 +92,9 @@ jobs:
         working-directory: Code_Opensource/kernel
         run: |
           echo "正在配置内核..."
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- merge_kona_defconfig
+          # 尝试使用 merge_kona_defconfig，如果失败则使用 vendor/kona_defconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 merge_kona_defconfig || \
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 vendor/kona_defconfig
           echo "配置完成"
       
       - name: Build kernel image
