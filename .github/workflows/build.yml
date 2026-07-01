@@ -74,23 +74,17 @@ jobs:
           echo "已修补 Makefile"
 
           # 创建缺失的华为私有头文件存根
-          cat > include/rtg_sched.h << 'STUB'
-          #ifndef _RTG_SCHED_H
-          #define _RTG_SCHED_H
-          #endif
-          STUB
-          cat > include/frame.h << 'STUB'
-          #ifndef _FRAME_H
-          #define _FRAME_H
-          #endif
-          STUB
+          echo '#ifndef _RTG_SCHED_H
+#define _RTG_SCHED_H
+#endif' > include/rtg_sched.h
+          echo '#ifndef _FRAME_H
+#define _FRAME_H
+#endif' > include/frame.h
 
           # 创建缺失的 hw_root_scan 头文件存根
-          cat > security/hw_root_scan/include/hw_rscan_utils.h << 'STUB'
-          #ifndef _HW_RSCAN_UTILS_H
-          #define _HW_RSCAN_UTILS_H
-          #endif
-          STUB
+          echo '#ifndef _HW_RSCAN_UTILS_H
+#define _HW_RSCAN_UTILS_H
+#endif' > security/hw_root_scan/include/hw_rscan_utils.h
 
       - name: Verify toolchain
         run: |
