@@ -73,6 +73,30 @@ jobs:
 
           echo "已修补 Makefile"
 
+          # 创建缺失的华为私有头文件存根
+          mkdir -p kernel/include/linux
+          cat > kernel/include/linux/rtg_sched.h << 'STUB'
+          /* Stub header for build */
+          #ifndef _RTG_SCHED_H
+          #define _RTG_SCHED_H
+          #endif
+          STUB
+          cat > kernel/include/linux/frame.h << 'STUB'
+          /* Stub header for build */
+          #ifndef _FRAME_H
+          #define _FRAME_H
+          #endif
+          STUB
+
+          # 创建缺失的 hw_root_scan 头文件存根
+          mkdir -p kernel/security/hw_root_scan/include
+          cat > kernel/security/hw_root_scan/include/hw_rscan_utils.h << 'STUB'
+          /* Stub header for build */
+          #ifndef _HW_RSCAN_UTILS_H
+          #define _HW_RSCAN_UTILS_H
+          #endif
+          STUB
+
       - name: Verify toolchain
         run: |
           echo "=== clang ==="
