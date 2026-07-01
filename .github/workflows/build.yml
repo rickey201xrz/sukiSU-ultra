@@ -6,14 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag to download source from'
+        description: Release tag to download source from
         required: false
-        default: ''
+        default: ""
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,163 +34,60 @@ jobs:
           TAG=${{ steps.tag.outputs.tag }}
           ASSET_NAME="DBY-W09_HarmonyOS4.0.0_opensource.tar.gz"
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET_NAME}"
-          echo "从 Release 下载: $DOWNLOAD_URL"
           curl -L -o ${ASSET_NAME} ${DOWNLOAD_URL}
           ls -lh ${ASSET_NAME}
 
       - name: Extract source code
-        run: |
-          tar -xzf DBY-W09_HarmonyOS4.0.0_opensource.tar.gz
-          echo "解压完成"
-          ls -la Code_Opensource/
+        run: tar -xzf DBY-W09_HarmonyOS4.0.0_opensource.tar.gz
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential bc bison flex libssl-dev libncurses-dev \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
-            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi \
-            python3 device-tree-compiler lz4 cpio kmod rsync libelf-dev \
-            clang lld llvm
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses-dev gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi python3 device-tree-compiler lz4 cpio kmod rsync libelf-dev clang lld llvm
 
-      - name: Patch kernel source for GitHub Actions
+      - name: Patch kernel for standalone build
         working-directory: Code_Opensource/kernel
         run: |
-          # 修补1: Makefile L412 无条件覆盖CC为gcc-wrapper.py，注释掉
-          sed -i 's/^CC\t\t= $(PYTHON) $(srctree)\/scripts\/gcc-wrapper.py/# CC is overridden via command line/' Makefile
-
-          # 修补2: lcd_kit 依赖华为私有工具，开源包中不含，改为无操作
-          sed -i '/^lcd_kit: FORCE$/,/^$/c\lcd_kit: FORCE\n\t@echo "Skipping lcd_kit (proprietary tools not available)"' Makefile
-
-          # 修补3: 禁用新版clang不兼容的-Werror选项
           sed -i 's/-Werror=strict-prototypes/-Wno-error=strict-prototypes/g' Makefile
           sed -i 's/-Werror=implicit-int/-Wno-error=implicit-int/g' Makefile
           sed -i 's/-Werror=date-time/-Wno-error=date-time/g' Makefile
           sed -i 's/-Werror=incompatible-pointer-types/-Wno-error=incompatible-pointer-types/g' Makefile
           sed -i 's/-Werror=designated-init/-Wno-error=designated-init/g' Makefile
-
-          echo "已修补 Makefile"
-
-          # 创建缺失的华为私有头文件存根
-          echo '#ifndef _RTG_SCHED_H
-#define _RTG_SCHED_H
-#endif' > include/rtg_sched.h
-          echo '#ifndef _FRAME_H
-#define _FRAME_H
-#endif' > include/frame.h
-
-          # 创建缺失的 hw_root_scan 头文件存根
-          echo '#ifndef _HW_RSCAN_UTILS_H
-#define _HW_RSCAN_UTILS_H
-#endif' > security/hw_root_scan/include/hw_rscan_utils.h
-
-      - name: Verify toolchain
-        run: |
-          echo "=== clang ==="
-          clang --version
-          echo "=== GCC aarch64 ==="
-          aarch64-linux-gnu-gcc --version
+          sed -i '/^lcd_kit: FORCE/,/^$/c\lcd_kit: FORCE\n\t@true' Makefile
+          sed -i 's/^CC\t\t= $(PYTHON).*//g' Makefile
+          printf '#ifndef _RTG_SCHED_H\n#define _RTG_SCHED_H\n#endif\n' > include/rtg_sched.h
+          printf '#ifndef _FRAME_H\n#define _FRAME_H\n#endif\n' > include/frame.h
 
       - name: Configure kernel
         working-directory: Code_Opensource/kernel
-        env:
-          ARCH: arm64
-          CROSS_COMPILE: aarch64-linux-gnu-
-          CC: clang
-          LD: ld.lld
-          AR: llvm-ar
-          NM: llvm-nm
-          OBJCOPY: llvm-objcopy
-          OBJDUMP: llvm-objdump
-          READELF: llvm-readelf
         run: |
-          echo "正在配置内核..."
-          make merge_kona_defconfig
-          make olddefconfig
-          # 使用 scripts/config 正确禁用选项（处理依赖关系）
-          scripts/config --disable HMDFS_FS
-          scripts/config --disable HMDFS_ANDROID
-          scripts/config --disable HMDFS_1_0
-          scripts/config --disable HMDFS_CRYPTO
-          scripts/config --disable HW_F2FS_FS
-          scripts/config --disable HW_RTG
-          scripts/config --disable HW_ROOT_SCAN
-          # 最终确认配置
-          make olddefconfig
-          echo "配置完成"
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf merge_kona_defconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf olddefconfig
 
       - name: Build kernel image
         working-directory: Code_Opensource/kernel
-        env:
-          ARCH: arm64
-          CROSS_COMPILE: aarch64-linux-gnu-
-          CC: clang
-          LD: ld.lld
-          AR: llvm-ar
-          NM: llvm-nm
-          OBJCOPY: llvm-objcopy
-          OBJDUMP: llvm-objdump
-          READELF: llvm-readelf
         run: |
-          echo "正在编译内核 Image.gz-dtb..."
-          make -j$(nproc) Image.gz-dtb KCFLAGS="-Wno-error" 2>&1 | tee /tmp/build.log || true
-          echo "=== 最后100行 ==="
-          tail -100 /tmp/build.log
-          echo "=== 编译返回码: ${PIPESTATUS[0]} ==="
-          echo "=== arch/arm64/boot/ 内容 ==="
-          ls -lh arch/arm64/boot/ 2>&1 || true
+          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" Image.gz-dtb 2>&1 | tee /tmp/build.log; echo "exit: ${PIPESTATUS[0]}"
+          tail -50 /tmp/build.log
           ls -lh arch/arm64/boot/Image* 2>&1 || true
 
       - name: Build kernel modules
         working-directory: Code_Opensource/kernel
-        env:
-          ARCH: arm64
-          CROSS_COMPILE: aarch64-linux-gnu-
-          CC: clang
-          LD: ld.lld
-          AR: llvm-ar
-          NM: llvm-nm
-          OBJCOPY: llvm-objcopy
-          OBJDUMP: llvm-objdump
-          READELF: llvm-readelf
-        run: |
-          echo "正在编译内核模块..."
-          make -j$(nproc) modules KCFLAGS="-Wno-error" 2>&1 | tail -50
-          echo "模块编译完成"
+        run: make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" modules 2>&1 | tail -50
 
       - name: Install modules
         working-directory: Code_Opensource/kernel
-        env:
-          ARCH: arm64
-          CROSS_COMPILE: aarch64-linux-gnu-
-          CC: clang
-          LD: ld.lld
-          AR: llvm-ar
-          NM: llvm-nm
-          OBJCOPY: llvm-objcopy
-          OBJDUMP: llvm-objdump
-          READELF: llvm-readelf
         run: |
           mkdir -p /tmp/modules
-          make INSTALL_MOD_PATH=/tmp/modules modules_install
-          echo "模块安装完成"
-          ls -la /tmp/modules/lib/modules/
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf INSTALL_MOD_PATH=/tmp/modules modules_install
 
-      - name: Prepare and compress output
+      - name: Package output
         run: |
           mkdir -p output
-          cp Code_Opensource/kernel/arch/arm64/boot/Image.gz-dtb output/
-          cp -r /tmp/modules/lib/modules/ output/
-          if [ -d "Code_Opensource/kernel/arch/arm64/boot/dts" ]; then
-            mkdir -p output/dtb
-            find Code_Opensource/kernel/arch/arm64/boot/dts -name "*.dtb" -exec cp {} output/dtb/ \; 2>/dev/null || true
-          fi
-          echo "输出内容:"
-          ls -lhR output/
-          cd output
-          tar -czf ../sukiSU-kernel-DBY-W09.tar.gz .
-          cd ..
+          cp Code_Opensource/kernel/arch/arm64/boot/Image.gz-dtb output/ || true
+          cp -r /tmp/modules/lib/modules/ output/ || true
+          find Code_Opensource/kernel/arch/arm64/boot/dts -name "*.dtb" -exec cp {} output/ \; 2>/dev/null || true
+          tar -czf sukiSU-kernel-DBY-W09.tar.gz -C output .
           ls -lh sukiSU-kernel-DBY-W09.tar.gz
 
       - name: Upload kernel artifact
