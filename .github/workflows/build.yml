@@ -1,0 +1,152 @@
+name: Build sukiSU Kernel
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to download source from'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
+          else
+            # 获取最新的 release tag
+            LATEST_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | grep -o '"tag_name": "[^"]*"' | cut -d'"' -f4)
+            echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Download source from release
+        run: |
+          echo "正在从 Release 下载源码包..."
+          TAG=${{ steps.tag.outputs.tag }}
+          echo "Release Tag: $TAG"
+          
+          # 下载 tar.gz 文件
+          ASSET_NAME="DBY-W09_HarmonyOS4.0.0_opensource.tar.gz"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${ASSET_NAME}"
+          
+          echo "下载地址: $DOWNLOAD_URL"
+          curl -L -o ${ASSET_NAME} ${DOWNLOAD_URL}
+          
+          ls -lh ${ASSET_NAME}
+          echo "下载完成"
+      
+      - name: Extract source code
+        run: |
+          echo "正在解压源码包..."
+          tar -xzf DBY-W09_HarmonyOS4.0.0_opensource.tar.gz
+          echo "解压完成"
+          ls -la Code_Opensource/
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses-dev \
+            gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi \
+            binutils-arm-linux-gnueabi \
+            python3 \
+            python3-pip \
+            device-tree-compiler \
+            lz4 \
+            cpio \
+            kmod \
+            rsync \
+            libelf-dev
+      
+      - name: Verify toolchain
+        run: |
+          echo "=== GCC aarch64 ==="
+          aarch64-linux-gnu-gcc --version
+          echo "=== GCC arm ==="
+          arm-linux-gnueabi-gcc --version
+      
+      - name: Configure kernel
+        working-directory: Code_Opensource/kernel
+        run: |
+          echo "正在配置内核..."
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- merge_kona_defconfig
+          echo "配置完成"
+      
+      - name: Build kernel image
+        working-directory: Code_Opensource/kernel
+        run: |
+          echo "正在编译内核..."
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc) Image.gz-dtb 2>&1 | tail -50
+          echo "内核编译完成"
+          ls -lh arch/arm64/boot/Image.gz-dtb
+      
+      - name: Build kernel modules
+        working-directory: Code_Opensource/kernel
+        run: |
+          echo "正在编译内核模块..."
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 -j$(nproc) modules 2>&1 | tail -30
+          echo "模块编译完成"
+      
+      - name: Install modules
+        working-directory: Code_Opensource/kernel
+        run: |
+          echo "正在安装模块到临时目录..."
+          mkdir -p /tmp/modules
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 INSTALL_MOD_PATH=/tmp/modules modules_install
+          echo "模块安装完成"
+          ls -la /tmp/modules/lib/modules/
+      
+      - name: Prepare output package
+        run: |
+          echo "正在准备输出包..."
+          mkdir -p output
+          
+          # 复制内核镜像
+          cp Code_Opensource/kernel/arch/arm64/boot/Image.gz-dtb output/
+          
+          # 复制模块
+          cp -r /tmp/modules/lib/modules/ output/
+          
+          # 复制dtb文件（如果存在）
+          if [ -d "Code_Opensource/kernel/arch/arm64/boot/dts" ]; then
+            mkdir -p output/dtb
+            find Code_Opensource/kernel/arch/arm64/boot/dts -name "*.dtb" -exec cp {} output/dtb/ \; 2>/dev/null || true
+          fi
+          
+          echo "输出内容:"
+          ls -lhR output/
+      
+      - name: Compress output
+        run: |
+          echo "正在压缩输出..."
+          cd output
+          tar -czf ../sukiSU-kernel-DBY-W09.tar.gz .
+          cd ..
+          ls -lh sukiSU-kernel-DBY-W09.tar.gz
+          echo "压缩完成"
+      
+      - name: Upload kernel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sukiSU-kernel-DBY-W09
+          path: sukiSU-kernel-DBY-W09.tar.gz
+          retention-days: 30

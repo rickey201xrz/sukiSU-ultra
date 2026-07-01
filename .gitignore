@@ -1,0 +1,19 @@
+# 忽略文件
+.DS_Store
+*.o
+*.ko
+*.mod.c
+*.mod
+*.order
+*.symvers
+.*.cmd
+.*.d
+*.dtb
+*.dtbo
+
+# 解压后的源码目录（不要提交到仓库）
+Code_Opensource/
+
+# 构建输出
+output/
+sukisu-kernel-*.tar.gz
