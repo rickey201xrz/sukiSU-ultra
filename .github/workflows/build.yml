@@ -58,9 +58,13 @@ jobs:
       - name: Patch kernel source for GitHub Actions
         working-directory: Code_Opensource/kernel
         run: |
-          # Makefile 第412行无条件覆盖CC为gcc-wrapper.py，需要注释掉
+          # 修补1: Makefile L412 无条件覆盖CC为gcc-wrapper.py，注释掉
           sed -i 's/^CC\t\t= $(PYTHON) $(srctree)\/scripts\/gcc-wrapper.py/# CC is overridden via command line/' Makefile
-          echo "已修补 Makefile: 注释掉 gcc-wrapper.py 对 CC 的覆盖"
+
+          # 修补2: lcd_kit 依赖华为私有工具，开源包中不含，改为无操作
+          sed -i '/^lcd_kit: FORCE$/,/^$/c\lcd_kit: FORCE\n\t@echo "Skipping lcd_kit (proprietary tools not available)"' Makefile
+
+          echo "已修补 Makefile"
 
       - name: Verify toolchain
         run: |
