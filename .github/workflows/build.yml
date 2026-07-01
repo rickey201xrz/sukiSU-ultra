@@ -64,6 +64,13 @@ jobs:
           # 修补2: lcd_kit 依赖华为私有工具，开源包中不含，改为无操作
           sed -i '/^lcd_kit: FORCE$/,/^$/c\lcd_kit: FORCE\n\t@echo "Skipping lcd_kit (proprietary tools not available)"' Makefile
 
+          # 修补3: 禁用新版clang不兼容的-Werror选项
+          sed -i 's/-Werror=strict-prototypes/-Wno-error=strict-prototypes/g' Makefile
+          sed -i 's/-Werror=implicit-int/-Wno-error=implicit-int/g' Makefile
+          sed -i 's/-Werror=date-time/-Wno-error=date-time/g' Makefile
+          sed -i 's/-Werror=incompatible-pointer-types/-Wno-error=incompatible-pointer-types/g' Makefile
+          sed -i 's/-Werror=designated-init/-Wno-error=designated-init/g' Makefile
+
           echo "已修补 Makefile"
 
       - name: Verify toolchain
