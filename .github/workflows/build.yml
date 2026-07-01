@@ -88,12 +88,12 @@ jobs:
       - name: Build kernel image
         working-directory: Code_Opensource/kernel
         run: |
-          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" Image.gz-dtb
+          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error -include linux/version.h" Image.gz-dtb
           ls -lh arch/arm64/boot/Image*
 
       - name: Build kernel modules
         working-directory: Code_Opensource/kernel
-        run: make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" modules
+        run:           make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error -include linux/version.h" modules
 
       - name: Install modules
         working-directory: Code_Opensource/kernel
