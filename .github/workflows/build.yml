@@ -101,6 +101,9 @@ jobs:
           sed -i 's/^CONFIG_HMDFS_1_0=y/# CONFIG_HMDFS_1_0 is not set/' .config
           sed -i 's/^CONFIG_HMDFS_CRYPTO=y/# CONFIG_HMDFS_CRYPTO is not set/' .config
           sed -i 's/^CONFIG_HW_F2FS_FS=y/# CONFIG_HW_F2FS_FS is not set/' .config
+          # 禁用缺少头文件的华为私有模块
+          sed -i 's/^CONFIG_HW_RTG=y/# CONFIG_HW_RTG is not set/' .config
+          sed -i 's/^CONFIG_HW_ROOT_SCAN=y/# CONFIG_HW_ROOT_SCAN is not set/' .config
           make olddefconfig
           echo "配置完成"
 
