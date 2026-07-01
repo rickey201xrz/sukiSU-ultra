@@ -60,6 +60,8 @@ jobs:
           sed -i 's/-Werror=designated-init/-Wno-error=designated-init/g' Makefile
           # 禁用fs/hmdfs中的-Werror
           sed -i 's/-Werror/-Wno-error/g' fs/hmdfs/Makefile 2>/dev/null || true
+          # 为sched子目录添加include路径（fair.c内联hw_eas/eas_hw.c需要）
+          sed -i '1i ccflags-y += -I$(srctree)/kernel/sched' kernel/sched/Makefile
           # 创建缺失的华为私有头文件存根
           mkdir -p include/include
           printf '#ifndef _RTG_SCHED_H\n#define _RTG_SCHED_H\n#endif\n' > include/include/rtg_sched.h
