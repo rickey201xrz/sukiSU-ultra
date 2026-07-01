@@ -48,32 +48,49 @@ jobs:
       - name: Patch kernel for standalone build
         working-directory: Code_Opensource/kernel
         run: |
+          # 禁用gcc-wrapper.py对CC的覆盖（用sed匹配实际的tab字符）
+          sed -i '/^CC.*gcc-wrapper\.py/d' Makefile
+          # 禁用lcd_kit依赖（华为私有工具链）
+          sed -i '/^lcd_kit: FORCE/,/^$/c\lcd_kit: FORCE\n\t@true' Makefile
+          # 禁用新版clang不兼容的-Werror
           sed -i 's/-Werror=strict-prototypes/-Wno-error=strict-prototypes/g' Makefile
           sed -i 's/-Werror=implicit-int/-Wno-error=implicit-int/g' Makefile
           sed -i 's/-Werror=date-time/-Wno-error=date-time/g' Makefile
           sed -i 's/-Werror=incompatible-pointer-types/-Wno-error=incompatible-pointer-types/g' Makefile
           sed -i 's/-Werror=designated-init/-Wno-error=designated-init/g' Makefile
-          sed -i '/^lcd_kit: FORCE/,/^$/c\lcd_kit: FORCE\n\t@true' Makefile
-          sed -i 's/^CC\t\t= $(PYTHON).*//g' Makefile
-          printf '#ifndef _RTG_SCHED_H\n#define _RTG_SCHED_H\n#endif\n' > include/rtg_sched.h
-          printf '#ifndef _FRAME_H\n#define _FRAME_H\n#endif\n' > include/frame.h
+          # 禁用fs/hmdfs中的-Werror
+          sed -i 's/-Werror/-Wno-error/g' fs/hmdfs/Makefile 2>/dev/null || true
+          # 创建缺失头文件存根（路径为include/include/因为编译器搜索-I$(srctree)/include）
+          mkdir -p include/include
+          printf '#ifndef _RTG_SCHED_H\n#define _RTG_SCHED_H\n#endif\n' > include/include/rtg_sched.h
+          printf '#ifndef _FRAME_H\n#define _FRAME_H\n#endif\n' > include/include/frame.h
+          printf '#ifndef _HW_RSCAN_UTILS_H\n#define _HW_RSCAN_UTILS_H\n#endif\n' > security/hw_root_scan/include/hw_rscan_utils.h
+          echo "Patch done"
 
       - name: Configure kernel
         working-directory: Code_Opensource/kernel
         run: |
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf merge_kona_defconfig
+          # 通过sed禁用无法编译的华为私有模块
+          sed -i 's/^CONFIG_HW_RTG=y/# CONFIG_HW_RTG is not set/' .config
+          sed -i 's/^CONFIG_HW_ROOT_SCAN=y/# CONFIG_HW_ROOT_SCAN is not set/' .config
+          sed -i 's/^CONFIG_HMDFS_FS=y/# CONFIG_HMDFS_FS is not set/' .config
+          sed -i 's/^CONFIG_HMDFS_ANDROID=y/# CONFIG_HMDFS_ANDROID is not set/' .config
+          sed -i 's/^CONFIG_HMDFS_1_0=y/# CONFIG_HMDFS_1_0 is not set/' .config
+          sed -i 's/^CONFIG_HMDFS_CRYPTO=y/# CONFIG_HMDFS_CRYPTO is not set/' .config
+          sed -i 's/^CONFIG_HW_F2FS_FS=y/# CONFIG_HW_F2FS_FS is not set/' .config
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf olddefconfig
+          echo "Configure done"
 
       - name: Build kernel image
         working-directory: Code_Opensource/kernel
         run: |
-          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" Image.gz-dtb 2>&1 | tee /tmp/build.log; echo "exit: ${PIPESTATUS[0]}"
-          tail -50 /tmp/build.log
-          ls -lh arch/arm64/boot/Image* 2>&1 || true
+          make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" Image.gz-dtb
+          ls -lh arch/arm64/boot/Image*
 
       - name: Build kernel modules
         working-directory: Code_Opensource/kernel
-        run: make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" modules 2>&1 | tail -50
+        run: make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf KCFLAGS="-Wno-error" modules
 
       - name: Install modules
         working-directory: Code_Opensource/kernel
@@ -84,8 +101,8 @@ jobs:
       - name: Package output
         run: |
           mkdir -p output
-          cp Code_Opensource/kernel/arch/arm64/boot/Image.gz-dtb output/ || true
-          cp -r /tmp/modules/lib/modules/ output/ || true
+          cp Code_Opensource/kernel/arch/arm64/boot/Image.gz-dtb output/
+          cp -r /tmp/modules/lib/modules/ output/
           find Code_Opensource/kernel/arch/arm64/boot/dts -name "*.dtb" -exec cp {} output/ \; 2>/dev/null || true
           tar -czf sukiSU-kernel-DBY-W09.tar.gz -C output .
           ls -lh sukiSU-kernel-DBY-W09.tar.gz
