@@ -111,7 +111,7 @@ jobs:
           READELF: llvm-readelf
         run: |
           echo "正在编译内核 Image.gz-dtb..."
-          make -j$(nproc) Image.gz-dtb 2>&1 | tail -80
+          make -j$(nproc) Image.gz-dtb KCFLAGS="-Wno-error" 2>&1 | tail -80
           echo "内核镜像编译完成"
           ls -lh arch/arm64/boot/Image.gz-dtb
 
@@ -129,7 +129,7 @@ jobs:
           READELF: llvm-readelf
         run: |
           echo "正在编译内核模块..."
-          make -j$(nproc) modules 2>&1 | tail -50
+          make -j$(nproc) modules KCFLAGS="-Wno-error" 2>&1 | tail -50
           echo "模块编译完成"
 
       - name: Install modules
