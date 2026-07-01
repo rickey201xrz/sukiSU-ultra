@@ -95,15 +95,16 @@ jobs:
         run: |
           echo "正在配置内核..."
           make merge_kona_defconfig
-          # 禁用华为私有文件系统（需要完整vendor源码树）
-          sed -i 's/^CONFIG_HMDFS_FS=y/# CONFIG_HMDFS_FS is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_ANDROID=y/# CONFIG_HMDFS_ANDROID is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_1_0=y/# CONFIG_HMDFS_1_0 is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_CRYPTO=y/# CONFIG_HMDFS_CRYPTO is not set/' .config
-          sed -i 's/^CONFIG_HW_F2FS_FS=y/# CONFIG_HW_F2FS_FS is not set/' .config
-          # 禁用缺少头文件的华为私有模块
-          sed -i 's/^CONFIG_HW_RTG=y/# CONFIG_HW_RTG is not set/' .config
-          sed -i 's/^CONFIG_HW_ROOT_SCAN=y/# CONFIG_HW_ROOT_SCAN is not set/' .config
+          make olddefconfig
+          # 使用 scripts/config 正确禁用选项（处理依赖关系）
+          scripts/config --disable HMDFS_FS
+          scripts/config --disable HMDFS_ANDROID
+          scripts/config --disable HMDFS_1_0
+          scripts/config --disable HMDFS_CRYPTO
+          scripts/config --disable HW_F2FS_FS
+          scripts/config --disable HW_RTG
+          scripts/config --disable HW_ROOT_SCAN
+          # 最终确认配置
           make olddefconfig
           echo "配置完成"
 
