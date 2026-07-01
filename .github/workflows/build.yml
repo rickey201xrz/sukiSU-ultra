@@ -57,9 +57,76 @@ jobs:
       - name: Fix Python 2 syntax issues
         run: |
           # 修复 gcc-wrapper.py 的 Python 2 语法问题
-          sed -i 's/print "error, forbidden warning:", m.group(2)/print("error, forbidden warning:", m.group(2))/' Code_Opensource/kernel/scripts/gcc-wrapper.py
-          # 移除其他可能的 Python 2 print 语句
-          find Code_Opensource/kernel/scripts -name "*.py" -exec sed -i 's/^print \(.*\)$/print(\1)/' {} \; 2>/dev/null || true
+          cat > Code_Opensource/kernel/scripts/gcc-wrapper.py << 'PYEOF'
+          #! /usr/bin/env python3
+          # SPDX-License-Identifier: GPL-2.0-only
+          # Copyright (c) 2011-2017, 2018 The Linux Foundation. All rights reserved.
+
+          import errno
+          import re
+          import os
+          import sys
+          import subprocess
+
+          allowed_warnings = set([
+              "umid.c:138",
+              "umid.c:213",
+              "umid.c:388",
+          ])
+
+          ofile = None
+
+          warning_re = re.compile(r'''(.*/|)([^/]+\.[a-z]+:\d+):(\d+:)? warning:''')
+          def interpret_warning(line):
+              line = line.rstrip('\n')
+              m = warning_re.match(line)
+              if m and m.group(2) not in allowed_warnings:
+                  print("error, forbidden warning:", m.group(2))
+                  if ofile:
+                      try:
+                          os.remove(ofile)
+                      except OSError:
+                          pass
+                  sys.exit(1)
+
+          def run_gcc():
+              args = sys.argv[1:]
+              try:
+                  i = args.index('-o')
+                  global ofile
+                  ofile = args[i+1]
+              except (ValueError, IndexError):
+                  pass
+
+              compiler = sys.argv[0]
+
+              try:
+                  proc = subprocess.Popen(args, stderr=subprocess.PIPE)
+                  for line in proc.stderr:
+                      if isinstance(line, bytes):
+                          line = line.decode('utf-8', errors='replace')
+                      print(line, end='')
+                      interpret_warning(line)
+
+                  result = proc.wait()
+              except OSError as e:
+                  result = e.errno
+                  if result == errno.ENOENT:
+                      print(args[0] + ':', e.strerror)
+                      print('Is your PATH set correctly?')
+                  else:
+                      print(' '.join(args), str(e))
+
+              return result
+
+          if __name__ == '__main__':
+              status = run_gcc()
+              sys.exit(status)
+          PYEOF
+          
+          # 修复其他 Python 文件的 print 语句
+          find Code_Opensource/kernel/scripts -name "*.py" -exec sed -i.bak 's/^print \(.*\)$/print(\1)/' {} \; 2>/dev/null || true
+          find Code_Opensource/kernel/scripts -name "*.bak" -delete 2>/dev/null || true
       
       - name: Install build dependencies
         run: |
