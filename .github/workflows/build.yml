@@ -71,14 +71,14 @@ jobs:
         working-directory: Code_Opensource/kernel
         run: |
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf merge_kona_defconfig
-          # 通过sed禁用无法编译的华为私有模块
-          sed -i 's/^CONFIG_HW_RTG=y/# CONFIG_HW_RTG is not set/' .config
-          sed -i 's/^CONFIG_HW_ROOT_SCAN=y/# CONFIG_HW_ROOT_SCAN is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_FS=y/# CONFIG_HMDFS_FS is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_ANDROID=y/# CONFIG_HMDFS_ANDROID is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_1_0=y/# CONFIG_HMDFS_1_0 is not set/' .config
-          sed -i 's/^CONFIG_HMDFS_CRYPTO=y/# CONFIG_HMDFS_CRYPTO is not set/' .config
-          sed -i 's/^CONFIG_HW_F2FS_FS=y/# CONFIG_HW_F2FS_FS is not set/' .config
+          # 用scripts/config正确禁用缺少依赖的华为私有模块
+          scripts/config --disable HW_RTG
+          scripts/config --disable HW_ROOT_SCAN
+          scripts/config --disable HMDFS_FS
+          scripts/config --disable HMDFS_ANDROID
+          scripts/config --disable HMDFS_1_0
+          scripts/config --disable HMDFS_CRYPTO
+          scripts/config --disable HW_F2FS_FS
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf olddefconfig
           echo "Configure done"
 
