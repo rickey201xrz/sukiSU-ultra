@@ -72,6 +72,7 @@ jobs:
         run: |
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf merge_kona_defconfig
           # 用scripts/config正确禁用缺少依赖的华为私有模块
+          scripts/config --disable HW_AI_SCHED
           scripts/config --disable HW_RTG
           scripts/config --disable HW_ROOT_SCAN
           scripts/config --disable HMDFS_FS
