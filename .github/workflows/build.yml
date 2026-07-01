@@ -118,12 +118,13 @@ jobs:
           READELF: llvm-readelf
         run: |
           echo "正在编译内核 Image.gz-dtb..."
-          make -j$(nproc) Image.gz-dtb KCFLAGS="-Wno-error" 2>&1 | tail -200
+          make -j$(nproc) Image.gz-dtb KCFLAGS="-Wno-error" 2>&1 | tee /tmp/build.log || true
+          echo "=== 最后100行 ==="
+          tail -100 /tmp/build.log
           echo "=== 编译返回码: ${PIPESTATUS[0]} ==="
           echo "=== arch/arm64/boot/ 内容 ==="
           ls -lh arch/arm64/boot/ 2>&1 || true
           ls -lh arch/arm64/boot/Image* 2>&1 || true
-          echo "内核镜像编译完成"
 
       - name: Build kernel modules
         working-directory: Code_Opensource/kernel
